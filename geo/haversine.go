@@ -1,5 +1,5 @@
 //Haversine to find distance b/w to locations
-package haverine
+package geo
 
 import "math"
 

@@ -1,4 +1,4 @@
-package haversine
+package geo 
 
 import "testing"
 
