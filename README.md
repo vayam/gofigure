@@ -4,10 +4,13 @@ gofigure
 gotta be something in go right?
 
 
-[Haversine Implementation in go](http://en.wikipedia.org/wiki/Haversine_formula)
+
+###Package geo
+[Haversine](http://en.wikipedia.org/wiki/Haversine_formula) implementation in go
 
 go get github.com/vayam/gofigure/geo
 
 ```
 func Haversine(lat1, lon1, lat2, lon2 float64) float64
+func Radians(deg float64) float64
 ```
