@@ -29,11 +29,11 @@ import (
 type Cache struct {
 	// Maxsize is the sum of cache entry sizes before
 	// an item is evicted. Zero means no limit.
-	MaxSize int
+	MaxSize int64
 
 	ll    *list.List
 	cache map[interface{}]*list.Element
-	Size  int
+	Size  int64
 }
 
 // A Key may be any value that is comparable. See http://golang.org/ref/spec#Comparison_operators
@@ -42,13 +42,13 @@ type Key interface{}
 type entry struct {
 	key   Key
 	value interface{}
-	Size  int
+	Size  int64
 }
 
 // New creates a new Cache.
 // If maxSize is zero, the cache has no limit and it's assumed
 // that eviction is done by the caller.
-func New(maxSize int) *Cache {
+func New(maxSize int64) *Cache {
 	return &Cache{
 		MaxSize: maxSize,
 		ll:      list.New(),
@@ -57,7 +57,7 @@ func New(maxSize int) *Cache {
 }
 
 // Add adds a value to the cache.
-func (c *Cache) Add(key Key, value interface{}, size int) bool {
+func (c *Cache) Add(key Key, value interface{}, size int64) bool {
 	if c.cache == nil {
 		c.cache = make(map[interface{}]*list.Element)
 		c.ll = list.New()
