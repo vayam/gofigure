@@ -23,6 +23,7 @@ package lru
 
 import (
 	"container/list"
+	"math"
 )
 
 // Cache is an LRU cache. It is not safe for concurrent access.
@@ -69,16 +70,22 @@ func (c *Cache) Add(key Key, value interface{}, size int64) bool {
 		return true
 	}
 
-	// Add the entry would Exceed the configured MaxSize
-	if c.MaxSize != 0 && size > c.MaxSize {
+	// Entry by itself is over the max capacity
+	if c.MaxSize > 0 && size > c.MaxSize {
 		return false
 	}
 
+	// Adding the entry would lead to integer overflow
+	if c.MaxSize > 0 && math.MaxInt64-c.Size < size {
+		return false
+	}
+
+	// Add item to cache
 	ele := c.ll.PushFront(&entry{key, value, size})
 	c.Size += size
 	c.cache[key] = ele
 
-	if c.MaxSize == 0 {
+	if c.MaxSize <= 0 {
 		return true
 	}
 
