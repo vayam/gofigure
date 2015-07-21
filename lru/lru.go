@@ -70,6 +70,10 @@ func (c *Cache) Add(key Key, value interface{}, size int64) bool {
 		return true
 	}
 
+	if size < 0 {
+		return false
+	}
+
 	// Entry by itself is over the max capacity
 	if c.MaxSize > 0 && size > c.MaxSize {
 		return false
