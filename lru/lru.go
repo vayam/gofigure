@@ -23,17 +23,18 @@ package lru
 
 import (
 	"container/list"
+	"math"
 )
 
 // Cache is an LRU cache. It is not safe for concurrent access.
 type Cache struct {
 	// Maxsize is the sum of cache entry sizes before
 	// an item is evicted. Zero means no limit.
-	MaxSize int
+	MaxSize int64
 
 	ll    *list.List
 	cache map[interface{}]*list.Element
-	Size  int
+	Size  int64
 }
 
 // A Key may be any value that is comparable. See http://golang.org/ref/spec#Comparison_operators
@@ -42,13 +43,13 @@ type Key interface{}
 type entry struct {
 	key   Key
 	value interface{}
-	Size  int
+	Size  int64
 }
 
 // New creates a new Cache.
 // If maxSize is zero, the cache has no limit and it's assumed
 // that eviction is done by the caller.
-func New(maxSize int) *Cache {
+func New(maxSize int64) *Cache {
 	return &Cache{
 		MaxSize: maxSize,
 		ll:      list.New(),
@@ -57,7 +58,7 @@ func New(maxSize int) *Cache {
 }
 
 // Add adds a value to the cache.
-func (c *Cache) Add(key Key, value interface{}, size int) bool {
+func (c *Cache) Add(key Key, value interface{}, size int64) bool {
 	if c.cache == nil {
 		c.cache = make(map[interface{}]*list.Element)
 		c.ll = list.New()
@@ -69,16 +70,26 @@ func (c *Cache) Add(key Key, value interface{}, size int) bool {
 		return true
 	}
 
-	// Add the entry would Exceed the configured MaxSize
-	if c.MaxSize != 0 && size > c.MaxSize {
+	if size < 0 {
 		return false
 	}
 
+	// Entry by itself is over the max capacity
+	if c.MaxSize > 0 && size > c.MaxSize {
+		return false
+	}
+
+	// Adding the entry would lead to integer overflow
+	if c.MaxSize > 0 && math.MaxInt64-c.Size < size {
+		return false
+	}
+
+	// Add item to cache
 	ele := c.ll.PushFront(&entry{key, value, size})
 	c.Size += size
 	c.cache[key] = ele
 
-	if c.MaxSize == 0 {
+	if c.MaxSize <= 0 {
 		return true
 	}
 

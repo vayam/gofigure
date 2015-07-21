@@ -17,6 +17,7 @@ limitations under the License.
 package lru
 
 import (
+	"math"
 	"testing"
 )
 
@@ -95,4 +96,13 @@ func TestAddOverCapacity(t *testing.T) {
 		t.Fatal("TestAddOverCapacity returned true")
 	}
 
+}
+
+func TestAddOverflow(t *testing.T) {
+	lru := New(math.MaxInt64)
+	lru.Add("myKey", 1234, math.MaxInt64)
+	ok := lru.Add("myKey1", 1234, 1)
+	if ok {
+		t.Fatal("TestAddOverflow returned true")
+	}
 }
