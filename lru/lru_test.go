@@ -106,3 +106,12 @@ func TestAddOverflow(t *testing.T) {
 		t.Fatal("TestAddOverflow returned true")
 	}
 }
+
+func TestAddUnlimitedOverflow(t *testing.T) {
+	lru := New(0)
+	lru.Add("myKey", 1234, math.MaxInt64)
+	ok := lru.Add("myKey1", 1234, 1)
+	if !ok {
+		t.Fatal("TestAddUnlimitedOverflow returned false")
+	}
+}
