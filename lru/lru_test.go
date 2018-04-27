@@ -19,6 +19,7 @@ package lru
 import (
 	"math"
 	"testing"
+	"time"
 )
 
 type simpleStruct struct {
@@ -113,5 +114,74 @@ func TestAddUnlimitedOverflow(t *testing.T) {
 	ok := lru.Add("myKey1", 1234, 1)
 	if !ok {
 		t.Fatal("TestAddUnlimitedOverflow returned false")
+	}
+}
+
+func TestGetExpired(t *testing.T) {
+	t.Parallel()
+	lru := New(math.MaxInt64)
+	lru.TTL = 100 * time.Millisecond
+	lru.Add("myKey", 1234, 1)
+	time.Sleep(200 * time.Millisecond)
+	if _, ok := lru.Get("myKey"); ok {
+		t.Fatal("TestGetExpired returned an expired item")
+	}
+}
+
+func TestGetNotExpired(t *testing.T) {
+	lru := New(math.MaxInt64)
+	lru.TTL = 100 * time.Millisecond
+	lru.Add("myKey", 1234, 1)
+	if _, ok := lru.Get("myKey"); !ok {
+		t.Fatal("TestGetNotExpired did not return a non-expired item")
+	}
+}
+
+func TestRemoveExpiredExpired(t *testing.T) {
+	t.Parallel()
+	lru := New(math.MaxInt64)
+	lru.TTL = 100 * time.Millisecond
+	lru.Add("myKey1", 1234, 5)
+	lru.Add("myKey2", 5678, 5)
+	len1 := lru.Len()
+	size1 := lru.Size
+	time.Sleep(200 * time.Millisecond)
+	removed := lru.RemoveExpired(0)
+	len2 := lru.Len()
+	size2 := lru.Size
+	if len1 != 2 || size1 != 10 || removed != 2 || len2 != 0 || size2 != 0 {
+		t.Fatal("TestRemoveExpired failed to remove all expired items")
+	}
+}
+
+func TestRemoveExpiredMax(t *testing.T) {
+	t.Parallel()
+	lru := New(math.MaxInt64)
+	lru.TTL = 100 * time.Millisecond
+	lru.Add("myKey1", 1234, 5)
+	lru.Add("myKey2", 5678, 5)
+	len1 := lru.Len()
+	size1 := lru.Size
+	time.Sleep(200 * time.Millisecond)
+	removed := lru.RemoveExpired(1)
+	len2 := lru.Len()
+	size2 := lru.Size
+	if len1 != 2 || size1 != 10 || removed != 1 || len2 != 1 || size2 != 5 {
+		t.Fatal("TestRemoveExpiredMax failed to remove exactly 1 expired item")
+	}
+}
+
+func TestRemoveExpiredNotExpired(t *testing.T) {
+	lru := New(math.MaxInt64)
+	lru.TTL = 100 * time.Millisecond
+	lru.Add("myKey1", 1234, 5)
+	lru.Add("myKey2", 5678, 5)
+	len1 := lru.Len()
+	size1 := lru.Size
+	removed := lru.RemoveExpired(0)
+	len2 := lru.Len()
+	size2 := lru.Size
+	if len1 != 2 || size1 != 10 || removed != 0 || len2 != 2 || size2 != 10 {
+		t.Fatal("TestRemoveExpiredNotExpired failed to not remove non-expired items")
 	}
 }
