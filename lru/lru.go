@@ -24,6 +24,7 @@ package lru
 import (
 	"container/list"
 	"math"
+	"time"
 )
 
 // Cache is an LRU cache. It is not safe for concurrent access.
@@ -31,6 +32,10 @@ type Cache struct {
 	// Maxsize is the sum of cache entry sizes before
 	// an item is evicted. Zero means no limit.
 	MaxSize int64
+
+	// TTL is the maximum time a single item can remain in cache.
+	// If the value is 0, items do not expire.
+	TTL time.Duration
 
 	ll    *list.List
 	cache map[interface{}]*list.Element
@@ -41,9 +46,18 @@ type Cache struct {
 type Key interface{}
 
 type entry struct {
-	key   Key
-	value interface{}
-	Size  int64
+	key     Key
+	value   interface{}
+	Size    int64
+	Expires time.Time
+}
+
+func (e *entry) expired(now time.Time) bool {
+	return !e.Expires.IsZero() && now.After(e.Expires)
+}
+
+func (e *entry) Expired() bool {
+	return e.expired(time.Now())
 }
 
 // New creates a new Cache.
@@ -64,12 +78,6 @@ func (c *Cache) Add(key Key, value interface{}, size int64) bool {
 		c.ll = list.New()
 	}
 
-	if ee, ok := c.cache[key]; ok {
-		c.ll.MoveToFront(ee)
-		ee.Value.(*entry).value = value
-		return true
-	}
-
 	if size < 0 {
 		return false
 	}
@@ -84,8 +92,22 @@ func (c *Cache) Add(key Key, value interface{}, size int64) bool {
 		return false
 	}
 
+	// If item already exists with this key, replace it with a new one
+	// using the new value and size
+	if ee, ok := c.cache[key]; ok {
+		c.removeElement(ee)
+	}
+
 	// Add item to cache
-	ele := c.ll.PushFront(&entry{key, value, size})
+	e := &entry{
+		key:   key,
+		value: value,
+		Size:  size,
+	}
+	if c.TTL > 0 {
+		e.Expires = time.Now().Add(c.TTL)
+	}
+	ele := c.ll.PushFront(e)
 	c.Size += size
 	c.cache[key] = ele
 
@@ -93,10 +115,18 @@ func (c *Cache) Add(key Key, value interface{}, size int64) bool {
 		return true
 	}
 
-	//remove old entries
+	// Remove expired entries
+	for c.Size > c.MaxSize {
+		if c.RemoveExpired(1) == 0 {
+			break
+		}
+	}
+
+	// Remove old entries
 	for c.Size > c.MaxSize {
 		c.RemoveOldest()
 	}
+
 	return true
 }
 
@@ -106,8 +136,12 @@ func (c *Cache) Get(key Key) (value interface{}, ok bool) {
 		return
 	}
 	if ele, hit := c.cache[key]; hit {
+		kv := ele.Value.(*entry)
+		if kv.Expired() {
+			return
+		}
 		c.ll.MoveToFront(ele)
-		return ele.Value.(*entry).value, true
+		return kv.value, true
 	}
 	return
 }
@@ -131,6 +165,32 @@ func (c *Cache) RemoveOldest() {
 	if ele != nil {
 		c.removeElement(ele)
 	}
+}
+
+// RemoveExpired removes expired items from the cache.
+// Priority for removal is given to the oldest expired items. The max parameter
+// determines the maximum number of items to remove. A value of 0 for max will
+// remove all expired items.
+// Returns the number of items removed.
+func (c *Cache) RemoveExpired(max int) int {
+	if c.cache == nil || c.TTL == 0 {
+		return 0
+	}
+	removed := 0
+	now := time.Now()
+	for e := c.ll.Back(); e != nil; {
+		kv := e.Value.(*entry)
+		prev := e.Prev()
+		if kv.expired(now) {
+			c.removeElement(e)
+			removed++
+			if max > 0 && removed == max {
+				break
+			}
+		}
+		e = prev
+	}
+	return removed
 }
 
 func (c *Cache) removeElement(e *list.Element) {
