@@ -137,6 +137,19 @@ func TestGetNotExpired(t *testing.T) {
 	}
 }
 
+func TestExplicitExpiration(t *testing.T) {
+	lru := New(math.MaxInt64)
+	lru.AddWithExpiration("exp100ms", 1234, 1, time.Now().Add(100*time.Millisecond))
+	lru.AddWithExpiration("exp500ms", 1234, 1, time.Now().Add(500*time.Millisecond))
+	time.Sleep(200 * time.Millisecond)
+	if _, ok := lru.Get("exp100ms"); ok {
+		t.Fatal("TestExplicitExpiration didn't expire exp100ms")
+	}
+	if _, ok := lru.Get("exp500ms"); !ok {
+		t.Fatal("TestExplicitExpiration expired exp500ms")
+	}
+}
+
 func TestRemoveExpiredExpired(t *testing.T) {
 	t.Parallel()
 	lru := New(math.MaxInt64)
