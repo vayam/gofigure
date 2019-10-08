@@ -71,8 +71,7 @@ func New(maxSize int64) *Cache {
 	}
 }
 
-// Add adds a value to the cache.
-func (c *Cache) Add(key Key, value interface{}, size int64) bool {
+func (c *Cache) addWithExpiration(key Key, value interface{}, size int64, expires time.Time) bool {
 	if c.cache == nil {
 		c.cache = make(map[interface{}]*list.Element)
 		c.ll = list.New()
@@ -100,12 +99,10 @@ func (c *Cache) Add(key Key, value interface{}, size int64) bool {
 
 	// Add item to cache
 	e := &entry{
-		key:   key,
-		value: value,
-		Size:  size,
-	}
-	if c.TTL > 0 {
-		e.Expires = time.Now().Add(c.TTL)
+		key:     key,
+		value:   value,
+		Size:    size,
+		Expires: expires,
 	}
 	ele := c.ll.PushFront(e)
 	c.Size += size
@@ -128,6 +125,21 @@ func (c *Cache) Add(key Key, value interface{}, size int64) bool {
 	}
 
 	return true
+}
+
+// Add adds a value to the cache.
+func (c *Cache) Add(key Key, value interface{}, size int64) bool {
+	var expires time.Time
+	if c.TTL > 0 {
+		expires = time.Now().Add(c.TTL)
+	}
+
+	return c.addWithExpiration(key, value, size, expires)
+}
+
+// AddWithExpiration adds a value to the cache and sets its expiration explicitly
+func (c *Cache) AddWithExpiration(key Key, value interface{}, size int64, expires time.Time) bool {
+	return c.addWithExpiration(key, value, size, expires)
 }
 
 // Get looks up a key's value from the cache.
@@ -173,7 +185,7 @@ func (c *Cache) RemoveOldest() {
 // remove all expired items.
 // Returns the number of items removed.
 func (c *Cache) RemoveExpired(max int) int {
-	if c.cache == nil || c.TTL == 0 {
+	if c.cache == nil {
 		return 0
 	}
 	removed := 0
